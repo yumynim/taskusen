@@ -13,6 +13,21 @@ const ACCENT_KEY = 'prio.accent.v1';
 function loadAccent() { try { const r = localStorage.getItem(ACCENT_KEY); if (r) return r; } catch (e) {} return 'indigo'; }
 function saveAccent(id) { try { localStorage.setItem(ACCENT_KEY, id); } catch (e) {} }
 
+/* ---------- 完了履歴の日付ラベル / 日付グルーピング ---------- */
+function archDayLabel(ymd) {
+  if (!ymd) return '日付なし';
+  if (ymd === TODAY_YMD) return '今日';
+  const y = new Date(TODAY); y.setDate(y.getDate() - 1);
+  if (ymd === localYmd(y)) return '昨日';
+  const d = new Date(ymd);
+  return `${d.getMonth() + 1}月${d.getDate()}日 (${WD[d.getDay()]})`;
+}
+function groupByDay(list) {
+  const map = new Map();
+  list.forEach(t => { const k = (t.completedAt || '').slice(0, 10); if (!map.has(k)) map.set(k, []); map.get(k).push(t); });
+  return [...map.entries()];
+}
+
 /* ---------- segmented 1–5 ---------- */
 function MiniSeg({ value, onChange }) {
   return <span className="seg">{[1, 2, 3, 4, 5].map(n => (
@@ -156,8 +171,28 @@ function ChiefOfStaff({ tasks, onOpen, onHover, hlId }) {
   const over = totalMin > CAP;
   const dsTop = top ? deadlineState(top) : null;
 
+  const doneToday = completedOn(tasks, TODAY_YMD);
+  const dueToday = active.filter(t => { const d = daysUntil(t.deadline); return d !== null && d <= 0; });
+  const todayTotal = doneToday + dueToday.length;
+  const donePct = todayTotal ? Math.round(doneToday / todayTotal * 100) : 0;
+  const streak = streakDays(tasks);
+
   return (
     <div className="cos">
+      {/* TODAY ACHIEVEMENT */}
+      <div className="cos-sec cos-today">
+        <div className="cos-sec-head">
+          <div className="eyebrow">今日の達成</div>
+          {streak > 0 && <span className="streak-chip"><Ic d={Icons.bolt} size={12} fill sw={1.4} />連続 {streak}日</span>}
+        </div>
+        <div className="today-top">
+          <div className="today-num"><span className="today-big tnum">{doneToday}</span><span className="today-of tnum">/ {todayTotal} 件 完了</span></div>
+          <span className="today-pct tnum">{donePct}%</span>
+        </div>
+        <div className="cap-track"><div className="cap-fill done" style={{ width: `${donePct}%` }} /></div>
+        <div className="today-note">{doneToday === 0 ? 'まずは1件、チェックを付けてみましょう' : donePct >= 100 ? '今日の締切は完了。お見事です。' : `あと ${dueToday.length} 件で今日の締切が片付きます`}</div>
+      </div>
+
       {/* HERO */}
       <div className="cos-sec cos-hero">
         <div className="eyebrow"><span className="dot" />次に取り組むべきこと</div>
@@ -231,7 +266,7 @@ function ChiefOfStaff({ tasks, onOpen, onHover, hlId }) {
 }
 
 /* ---------- Settings: category manager + accent ---------- */
-function SettingsModal({ categories, setCategories, addCategory, deleteCategory, tasks, accent, setAccent, onClose }) {
+function SettingsModal({ categories, setCategories, addCategory, deleteCategory, tasks, accent, setAccent, onReset, onClose }) {
   const [pop, setPop] = useS(null);
   const [newName, setNewName] = useS('');
   const [newColor, setNewColor] = useS(CAT_PALETTE[7]);
@@ -284,6 +319,16 @@ function SettingsModal({ categories, setCategories, addCategory, deleteCategory,
               ))}
             </div>
           </div>
+          <div className="set-sec">
+            <span className="eyebrow">データ</span>
+            <div className="set-data-row">
+              <div className="sd-text">
+                <div className="sd-title">すべてのタスクを削除して最初から</div>
+                <div className="sd-sub">サンプル（デモ）を消して自分用に始めます。データはこの端末のブラウザに保存され、元には戻せません。</div>
+              </div>
+              <button className="btn btn-danger-outline" onClick={() => { if (window.confirm('すべてのタスクを削除して最初から始めますか？\nこの操作は元に戻せません。')) { onReset(); onClose(); } }}>リセット</button>
+            </div>
+          </div>
         </div>
         <div className="modal-foot">
           <button className="btn btn-primary" onClick={onClose}>完了</button>
@@ -320,7 +365,8 @@ function App() {
   const addCategory = (name, color) => setCategories(cs => [...cs, { id: newId(), name: name.trim(), color }]);
   const deleteCategory = (id) => { const rest = categories.filter(c => c.id !== id); const fb = rest.length ? rest[0].id : null; setTasks(ts => ts.map(t => t.category === id ? { ...t, category: fb } : t)); setCategories(rest); if (activeCat === id) setCat('all'); };
 
-  const toggle = id => setTasks(ts => ts.map(t => t.id === id ? { ...t, done: !t.done, completedAt: !t.done ? new Date().toISOString().slice(0, 10) : null } : t));
+  const toggle = id => setTasks(ts => ts.map(t => t.id === id ? { ...t, done: !t.done, completedAt: !t.done ? localYmd() : null } : t));
+  const resetData = () => { setTasks([]); setCat('all'); setFilter('all'); setView('list'); };
   const save = d => { setTasks(ts => ts.some(t => t.id === d.id) ? ts.map(t => t.id === d.id ? { ...d, _isNew: undefined } : t) : [{ ...d, _isNew: undefined }, ...ts]); if (d._isNew) { setFlash(d.id); setTimeout(() => setFlash(null), 1100); } setEditing(null); };
   const add = t => { setTasks(ts => [t, ...ts]); setFlash(t.id); setTimeout(() => setFlash(null), 1100); };
   const del = id => { setTasks(ts => ts.filter(t => t.id !== id)); setEditing(null); };
@@ -425,18 +471,27 @@ function App() {
           {view === 'archive' && (
             <div style={{ maxWidth: 720 }}>
               {archived.length === 0 ? (
-                <div className="empty"><Ic d={Icons.archive} size={38} /><div className="empty-title">完了タスクはまだありません</div></div>
-              ) : archived.map(t => (
-                <div key={t.id} className="arch-item">
-                  <button className="dcard-check done" onClick={() => toggle(t.id)}><Ic d={Icons.check} size={11} sw={2.6} /></button>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="dcard-title">{t.title}</div>
-                    <div className="dcard-meta" style={{ marginTop: 6 }}>
-                      <span className="meta-cat">{catOf(t.category).name}</span>
-                      <span className="meta-item"><Ic d={Icons.check} size={11} />{t.completedAt ? `${fmtDate(t.completedAt)} 完了` : '完了'}</span>
-                    </div>
+                <div className="empty"><Ic d={Icons.archive} size={38} /><div className="empty-title">完了タスクはまだありません</div><div className="empty-sub">チェックを付けると、ここに達成記録が残ります</div></div>
+              ) : groupByDay(archived).map(([day, items]) => (
+                <div key={day || 'none'} className="arch-day">
+                  <div className="arch-day-head">
+                    <span className="arch-day-label">{archDayLabel(day)}</span>
+                    <span className="arch-day-count tnum">{items.length}件 完了</span>
                   </div>
-                  <span className="reco-score tnum">指数 {scoreOf(t)}</span>
+                  {items.map(t => (
+                    <div key={t.id} className="arch-item">
+                      <button className="dcard-check done" onClick={() => toggle(t.id)}><Ic d={Icons.check} size={11} sw={2.6} /></button>
+                      <div style={{ minWidth: 0 }}>
+                        <div className="dcard-title">{t.title}</div>
+                        <div className="dcard-meta" style={{ marginTop: 6 }}>
+                          <span className="meta-dot" style={{ background: catOf(t.category).color }} />
+                          <span className="meta-cat">{catOf(t.category).name}</span>
+                          {t.estMin > 0 && <span className="meta-item"><Ic d={Icons.clock} size={11} />{fmtMinutes(t.estMin)}</span>}
+                        </div>
+                      </div>
+                      <span className="reco-score tnum">指数 {scoreOf(t)}</span>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -456,7 +511,7 @@ function App() {
       </div>
 
       {editing && <Editor task={editing} categories={categories} onSave={save} onDelete={del} onClose={() => setEditing(null)} />}
-      {settingsOpen && <SettingsModal categories={categories} setCategories={setCategories} addCategory={addCategory} deleteCategory={deleteCategory} tasks={tasks} accent={accent} setAccent={setAccent} onClose={() => setSettings(false)} />}
+      {settingsOpen && <SettingsModal categories={categories} setCategories={setCategories} addCategory={addCategory} deleteCategory={deleteCategory} tasks={tasks} accent={accent} setAccent={setAccent} onReset={resetData} onClose={() => setSettings(false)} />}
     </div>
   );
 }

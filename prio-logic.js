@@ -1,6 +1,27 @@
 /* ===== Priority logic + sample data (plain JS, window globals) ===== */
 
-const TODAY = new Date('2026-06-13T09:00:00');
+// 実際の「今日」を基準にする（日々の運用で締切判定が毎日更新される）
+const TODAY = new Date();
+
+// ローカルタイムの YYYY-MM-DD（完了履歴・連続記録の基準。タイムゾーンずれを防ぐ）
+function localYmd(d) {
+  const x = d ? new Date(d) : new Date();
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+}
+const TODAY_YMD = localYmd(TODAY);
+
+// 指定日に完了した件数
+function completedOn(tasks, ymd) {
+  return tasks.filter(t => t.done && (t.completedAt || '').slice(0, 10) === ymd).length;
+}
+// 今日まで連続で「1件以上完了した日」が続いている日数（今日未完了でも昨日までは維持）
+function streakDays(tasks) {
+  const days = new Set(tasks.filter(t => t.done && t.completedAt).map(t => t.completedAt.slice(0, 10)));
+  let n = 0; const d = new Date(TODAY);
+  if (!days.has(localYmd(d))) d.setDate(d.getDate() - 1); // 今日まだなら昨日から数える
+  while (days.has(localYmd(d))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
 
 // ---- Curated calm palette for categories / custom colors ----
 const CAT_PALETTE = [
@@ -114,25 +135,27 @@ const FILTERS = {
 };
 
 // ---- Sample data (student life, Japanese) ----
+// 締切は「今日」基準の相対日付にして、いつ開いてもデモが自然に見えるようにする
+function dPlus(n) { const d = new Date(TODAY); d.setDate(d.getDate() + n); return localYmd(d); }
 const SAMPLE_TASKS = [
-  { id: 't1',  title: '経済学概論のレポート提出', category: 'assign', importance: 5, urgency: 5, effort: 3, deadline: '2026-06-14', estMin: 120, done: false },
-  { id: 't2',  title: 'データ構造の課題（実装）', category: 'assign', importance: 4, urgency: 4, effort: 4, deadline: '2026-06-15', estMin: 180, done: false },
-  { id: 't3',  title: 'バイトのシフト希望を提出', category: 'parttime', importance: 3, urgency: 5, effort: 1, deadline: '2026-06-13', estMin: 10, done: false },
-  { id: 't4',  title: 'TOEIC単語 100語暗記', category: 'study', importance: 4, urgency: 2, effort: 2, deadline: '2026-06-30', estMin: 30, done: false },
-  { id: 't5',  title: 'ポートフォリオサイトを作る', category: 'dev', importance: 4, urgency: 2, effort: 5, deadline: '2026-07-10', estMin: 600, done: false },
-  { id: 't6',  title: '線形代数の演習問題', category: 'study', importance: 3, urgency: 3, effort: 3, deadline: '2026-06-18', estMin: 90, done: false },
-  { id: 't7',  title: 'ゼミ発表スライドを作成', category: 'assign', importance: 5, urgency: 4, effort: 4, deadline: '2026-06-16', estMin: 150, done: false },
-  { id: 't8',  title: '図書館で参考文献を借りる', category: 'study', importance: 3, urgency: 4, effort: 1, deadline: '2026-06-13', estMin: 20, done: false },
-  { id: 't9',  title: '健康診断の予約を取る', category: 'life', importance: 4, urgency: 3, effort: 1, deadline: '2026-06-20', estMin: 15, done: false },
-  { id: 't10', title: 'サークルの会計報告をまとめる', category: 'life', importance: 3, urgency: 4, effort: 2, deadline: '2026-06-11', estMin: 45, done: false },
-  { id: 't11', title: '過去問をコピーして整理', category: 'study', importance: 4, urgency: 5, effort: 2, deadline: '2026-06-14', estMin: 30, done: false },
+  { id: 't1',  title: '経済学概論のレポート提出', category: 'assign', importance: 5, urgency: 5, effort: 3, deadline: dPlus(1), estMin: 120, done: false },
+  { id: 't2',  title: 'データ構造の課題（実装）', category: 'assign', importance: 4, urgency: 4, effort: 4, deadline: dPlus(2), estMin: 180, done: false },
+  { id: 't3',  title: 'バイトのシフト希望を提出', category: 'parttime', importance: 3, urgency: 5, effort: 1, deadline: dPlus(0), estMin: 10, done: false },
+  { id: 't4',  title: 'TOEIC単語 100語暗記', category: 'study', importance: 4, urgency: 2, effort: 2, deadline: dPlus(16), estMin: 30, done: false },
+  { id: 't5',  title: 'ポートフォリオサイトを作る', category: 'dev', importance: 4, urgency: 2, effort: 5, deadline: dPlus(26), estMin: 600, done: false },
+  { id: 't6',  title: '線形代数の演習問題', category: 'study', importance: 3, urgency: 3, effort: 3, deadline: dPlus(4), estMin: 90, done: false },
+  { id: 't7',  title: 'ゼミ発表スライドを作成', category: 'assign', importance: 5, urgency: 4, effort: 4, deadline: dPlus(2), estMin: 150, done: false },
+  { id: 't8',  title: '図書館で参考文献を借りる', category: 'study', importance: 3, urgency: 4, effort: 1, deadline: dPlus(0), estMin: 20, done: false },
+  { id: 't9',  title: '健康診断の予約を取る', category: 'life', importance: 4, urgency: 3, effort: 1, deadline: dPlus(6), estMin: 15, done: false },
+  { id: 't10', title: 'サークルの会計報告をまとめる', category: 'life', importance: 3, urgency: 4, effort: 2, deadline: dPlus(-2), estMin: 45, done: false },
+  { id: 't11', title: '過去問をコピーして整理', category: 'study', importance: 4, urgency: 5, effort: 2, deadline: dPlus(1), estMin: 30, done: false },
   { id: 't12', title: 'プログラミング講座の動画を視聴', category: 'dev', importance: 3, urgency: 1, effort: 3, deadline: null, estMin: 60, done: false },
   { id: 't13', title: '部屋の片付け', category: 'life', importance: 2, urgency: 2, effort: 3, deadline: null, estMin: 40, done: false },
-  { id: 't14', title: '友達と勉強会を計画する', category: 'study', importance: 2, urgency: 3, effort: 2, deadline: '2026-06-17', estMin: 25, done: false },
+  { id: 't14', title: '友達と勉強会を計画する', category: 'study', importance: 2, urgency: 3, effort: 2, deadline: dPlus(3), estMin: 25, done: false },
   // completed (archive)
-  { id: 't15', title: '英語のリスニング課題を提出', category: 'assign', importance: 4, urgency: 5, effort: 2, deadline: '2026-06-12', estMin: 40, done: true, completedAt: '2026-06-12' },
-  { id: 't16', title: 'レジ締めマニュアルを確認', category: 'parttime', importance: 3, urgency: 3, effort: 1, deadline: '2026-06-11', estMin: 15, done: true, completedAt: '2026-06-11' },
-  { id: 't17', title: '奨学金の書類を郵送', category: 'life', importance: 5, urgency: 4, effort: 2, deadline: '2026-06-10', estMin: 30, done: true, completedAt: '2026-06-10' },
+  { id: 't15', title: '英語のリスニング課題を提出', category: 'assign', importance: 4, urgency: 5, effort: 2, deadline: dPlus(-1), estMin: 40, done: true, completedAt: dPlus(-1) },
+  { id: 't16', title: 'レジ締めマニュアルを確認', category: 'parttime', importance: 3, urgency: 3, effort: 1, deadline: dPlus(-2), estMin: 15, done: true, completedAt: dPlus(-2) },
+  { id: 't17', title: '奨学金の書類を郵送', category: 'life', importance: 5, urgency: 4, effort: 2, deadline: dPlus(-3), estMin: 30, done: true, completedAt: dPlus(0) },
 ];
 
 // ---- Recommendation verb per group (calm, professional) ----
@@ -202,7 +225,8 @@ function impactOf(t) {
 
 // expose
 Object.assign(window, {
-  TODAY, CATEGORIES, GROUPS, GROUP_ORDER, FILTERS, SAMPLE_TASKS, RECO, CAT_PALETTE, ACCENTS,
+  TODAY, TODAY_YMD, CATEGORIES, GROUPS, GROUP_ORDER, FILTERS, SAMPLE_TASKS, RECO, CAT_PALETTE, ACCENTS,
   scoreOf, groupOf, colorVarOf, daysUntil, deadlineState, fmtDate, fmtMinutes, badgesOf, startOfDay,
   recommendationOf, isUrgentSignal, reasonChips, heroReason, impactOf, applyCats, catOf,
+  localYmd, completedOn, streakDays,
 });

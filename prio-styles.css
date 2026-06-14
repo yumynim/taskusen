@@ -410,3 +410,27 @@ input, select, textarea { font-family: inherit; }
   .cos { padding: 22px 20px 96px; }
   .field-row { grid-template-columns: 1fr; }
 }
+
+/* ===== 今日の達成（履歴ベースの進捗・連続記録） ===== */
+.streak-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 650; color: var(--do-first-ink); background: rgba(194,105,29,.10); border: 1px solid rgba(194,105,29,.18); padding: 3px 9px 3px 7px; border-radius: 99px; }
+.today-top { display: flex; align-items: baseline; justify-content: space-between; margin: 10px 0 8px; }
+.today-num { display: flex; align-items: baseline; gap: 7px; }
+.today-big { font-size: 30px; font-weight: 750; letter-spacing: -.02em; color: var(--ink); line-height: 1; }
+.today-of { font-size: 12.5px; font-weight: 550; color: var(--ink-4); }
+.today-pct { font-size: 13px; font-weight: 650; color: var(--done); }
+.cap-fill.done { background: var(--done); }
+.today-note { margin-top: 9px; font-size: 11.5px; color: var(--ink-4); }
+
+/* ===== 完了アーカイブ：日付ごとの履歴 ===== */
+.arch-day { margin-bottom: 22px; }
+.arch-day-head { display: flex; align-items: baseline; gap: 10px; padding: 0 2px 8px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.arch-day-label { font-size: 13.5px; font-weight: 700; color: var(--ink-2); letter-spacing: -.01em; }
+.arch-day-count { font-size: 11.5px; font-weight: 550; color: var(--ink-4); }
+
+/* ===== 設定：データ（リセット） ===== */
+.set-data-row { display: flex; align-items: center; gap: 14px; justify-content: space-between; }
+.sd-text { min-width: 0; }
+.sd-title { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.sd-sub { font-size: 11.5px; color: var(--ink-4); margin-top: 3px; line-height: 1.5; }
+.btn-danger-outline { flex: none; font-size: 12.5px; font-weight: 600; color: var(--signal-ink); background: var(--surface); border: 1px solid var(--signal-line); border-radius: var(--r-sm); padding: 8px 16px; cursor: pointer; transition: var(--t); }
+.btn-danger-outline:hover { background: var(--signal-soft); }
