@@ -1,8 +1,14 @@
 /* ===== App — Decision OS ===== */
 const { useState: useS, useEffect: useE, useRef: useR, useMemo: useM } = React;
 
-const STORE_KEY = 'prio.tasks.v3';
-function loadTasks() { try { const r = localStorage.getItem(STORE_KEY); if (r) return JSON.parse(r); } catch (e) {} return SAMPLE_TASKS.map(t => ({ ...t })); }
+const STORE_KEY = 'prio.tasks.v4';
+const LEGACY_TASK_KEYS = ['prio.tasks.v3', 'prio.tasks.v2', 'prio.tasks.v1'];
+function loadTasks() {
+  try { const r = localStorage.getItem(STORE_KEY); if (r) return JSON.parse(r); } catch (e) {}
+  // 旧バージョンに残っているデモ/サンプル履歴は読み込まず破棄し、まっさらな状態から始める
+  try { LEGACY_TASK_KEYS.forEach(k => localStorage.removeItem(k)); } catch (e) {}
+  return [];
+}
 function saveTasks(t) { try { localStorage.setItem(STORE_KEY, JSON.stringify(t)); } catch (e) {} }
 let _seq = 100; const newId = () => `n${Date.now()}_${_seq++}`;
 const WD = '日月火水木金土';
