@@ -2,22 +2,52 @@
 const { useState: useS, useEffect: useE, useRef: useR, useMemo: useM } = React;
 
 const STORE_KEY = 'prio.tasks.v4';
+const CAT_KEY = 'prio.categories.v1';
+const ACCENT_KEY = 'prio.accent.v1';
 const LEGACY_TASK_KEYS = ['prio.tasks.v3', 'prio.tasks.v2', 'prio.tasks.v1'];
-function loadTasks() {
-  try { const r = localStorage.getItem(STORE_KEY); if (r) return JSON.parse(r); } catch (e) {}
-  // 旧バージョンに残っているデモ/サンプル履歴は読み込まず破棄し、まっさらな状態から始める
-  try { LEGACY_TASK_KEYS.forEach(k => localStorage.removeItem(k)); } catch (e) {}
-  return [];
-}
-function saveTasks(t) { try { localStorage.setItem(STORE_KEY, JSON.stringify(t)); } catch (e) {} }
 let _seq = 100; const newId = () => `n${Date.now()}_${_seq++}`;
 const WD = '日月火水木金土';
-const CAT_KEY = 'prio.categories.v1';
-function loadCats() { try { const r = localStorage.getItem(CAT_KEY); if (r) { const a = JSON.parse(r); if (Array.isArray(a) && a.length) return a; } } catch (e) {} return CATEGORIES.map(c => ({ ...c })); }
-function saveCats(c) { try { localStorage.setItem(CAT_KEY, JSON.stringify(c)); } catch (e) {} }
-const ACCENT_KEY = 'prio.accent.v1';
-function loadAccent() { try { const r = localStorage.getItem(ACCENT_KEY); if (r) return r; } catch (e) {} return 'indigo'; }
-function saveAccent(id) { try { localStorage.setItem(ACCENT_KEY, id); } catch (e) {} }
+
+// ---- アカウント（ローカルプロフィール）ごとに保存キーを分離 ----
+function pk(base, pid) { return (!pid || pid === 'default') ? base : `${base}::${pid}`; }
+function loadTasks(pid) {
+  try { const r = localStorage.getItem(pk(STORE_KEY, pid)); if (r) return JSON.parse(r); } catch (e) {}
+  // 旧バージョンに残っているデモ/サンプル履歴は読み込まず破棄し、まっさらな状態から始める
+  if (!pid || pid === 'default') { try { LEGACY_TASK_KEYS.forEach(k => localStorage.removeItem(k)); } catch (e) {} }
+  return [];
+}
+function saveTasks(pid, t) { try { localStorage.setItem(pk(STORE_KEY, pid), JSON.stringify(t)); } catch (e) {} }
+function loadCats(pid) { try { const r = localStorage.getItem(pk(CAT_KEY, pid)); if (r) { const a = JSON.parse(r); if (Array.isArray(a) && a.length) return a; } } catch (e) {} return CATEGORIES.map(c => ({ ...c })); }
+function saveCats(pid, c) { try { localStorage.setItem(pk(CAT_KEY, pid), JSON.stringify(c)); } catch (e) {} }
+function loadAccent(pid) { try { const r = localStorage.getItem(pk(ACCENT_KEY, pid)); if (r) return r; } catch (e) {} return 'indigo'; }
+function saveAccent(pid, id) { try { localStorage.setItem(pk(ACCENT_KEY, pid), id); } catch (e) {} }
+
+// ---- プロフィール（ローカルアカウント）一覧 ----
+const PROFILES_KEY = 'prio.profiles.v1';
+const ACTIVE_PROFILE_KEY = 'prio.activeProfile.v1';
+function loadProfiles() { try { const r = localStorage.getItem(PROFILES_KEY); if (r) { const a = JSON.parse(r); if (Array.isArray(a) && a.length) return a; } } catch (e) {} return [{ id: 'default', name: 'マイタスク' }]; }
+function saveProfiles(p) { try { localStorage.setItem(PROFILES_KEY, JSON.stringify(p)); } catch (e) {} }
+function loadActiveProfile() { try { const r = localStorage.getItem(ACTIVE_PROFILE_KEY); if (r) return r; } catch (e) {} return 'default'; }
+function saveActiveProfile(id) { try { localStorage.setItem(ACTIVE_PROFILE_KEY, id); } catch (e) {} }
+function clearProfileData(pid) { try { [STORE_KEY, CAT_KEY, ACCENT_KEY].forEach(b => localStorage.removeItem(pk(b, pid))); } catch (e) {} }
+
+// ---- リマインダー（ブラウザ通知。ページを開いている間だけ動作） ----
+const NOTIFY_KEY = 'prio.notified.v1';
+function reminderEnabled() { return typeof Notification !== 'undefined' && Notification.permission === 'granted'; }
+function checkReminders(tasks) {
+  if (!reminderEnabled()) return;
+  let state = {}; try { state = JSON.parse(localStorage.getItem(NOTIFY_KEY) || '{}'); } catch (e) {}
+  if (state.day !== TODAY_YMD) state = { day: TODAY_YMD, ids: [] };
+  tasks.forEach(t => {
+    if (t.done || !t.deadline) return;
+    const d = daysUntil(t.deadline);
+    if (d !== null && d <= 0 && !state.ids.includes(t.id)) {
+      try { new Notification('締切のタスク', { body: `${t.title}（${d < 0 ? Math.abs(d) + '日超過' : '今日が締切'}）`, tag: t.id }); } catch (e) {}
+      state.ids.push(t.id);
+    }
+  });
+  try { localStorage.setItem(NOTIFY_KEY, JSON.stringify(state)); } catch (e) {}
+}
 
 /* ---------- 完了履歴の日付ラベル / 日付グルーピング ---------- */
 function archDayLabel(ymd) {
@@ -83,6 +113,14 @@ function Editor({ task, onSave, onDelete, onClose, categories }) {
   const set = (k, v) => setD(p => ({ ...p, [k]: v }));
   const s = d.importance * d.urgency - d.effort;
   const g = groupOf(d);
+  const [tagInput, setTagInput] = useS('');
+  const tags = d.tags || [];
+  const subs = d.subtasks || [];
+  const addTag = () => { const v = tagInput.trim().replace(/^#/, ''); if (v && !tags.includes(v)) setD(p => ({ ...p, tags: [...(p.tags || []), v] })); setTagInput(''); };
+  const removeTag = tg => setD(p => ({ ...p, tags: (p.tags || []).filter(x => x !== tg) }));
+  const addSub = () => setD(p => ({ ...p, subtasks: [...(p.subtasks || []), { id: newId(), title: '', done: false }] }));
+  const setSub = (id, patch) => setD(p => ({ ...p, subtasks: (p.subtasks || []).map(x => x.id === id ? { ...x, ...patch } : x) }));
+  const delSub = id => setD(p => ({ ...p, subtasks: (p.subtasks || []).filter(x => x.id !== id) }));
   const Row = ({ label, k, hint }) => (
     <div className="field">
       <div className="field-label"><span>{label}</span><span className="hint">{hint}</span></div>
@@ -115,9 +153,47 @@ function Editor({ task, onSave, onDelete, onClose, categories }) {
           <Row label="重要度" k="importance" hint="どれだけ大事か" />
           <Row label="緊急度" k="urgency" hint="どれだけ急ぎか" />
           <Row label="労力" k="effort" hint="どれだけ大変か" />
-          <div className="field"><div className="field-label">想定時間（分）</div>
-            <input type="number" min="0" step="5" value={d.estMin} onChange={e => set('estMin', parseInt(e.target.value || '0', 10))} />
+          <div className="field-row">
+            <div className="field"><div className="field-label">想定時間（分）</div>
+              <input type="number" min="0" step="5" value={d.estMin} onChange={e => set('estMin', parseInt(e.target.value || '0', 10))} />
+            </div>
+            <div className="field"><div className="field-label">繰り返し</div>
+              <select value={d.repeat || 'none'} onChange={e => set('repeat', e.target.value)}>
+                {REPEATS.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </div>
           </div>
+
+          <div className="field">
+            <div className="field-label"><span>サブタスク</span>{subs.length > 0 && <span className="hint">{subs.filter(x => x.done).length}/{subs.length} 完了</span>}</div>
+            {subs.length > 0 && (
+              <div className="sub-list">
+                {subs.map(x => (
+                  <div key={x.id} className="sub-row">
+                    <button className={`sub-check ${x.done ? 'done' : ''}`} onClick={() => setSub(x.id, { done: !x.done })} aria-label="完了"><Ic d={Icons.check} size={10} sw={2.8} /></button>
+                    <input className={`sub-input ${x.done ? 'done' : ''}`} value={x.title} placeholder="サブタスクを入力" onChange={e => setSub(x.id, { title: e.target.value })} />
+                    <button className="sub-del" onClick={() => delSub(x.id)} aria-label="削除"><Ic d={Icons.x} size={13} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button className="sub-add" onClick={addSub}><Ic d={Icons.plus} size={13} sw={2} />サブタスクを追加</button>
+          </div>
+
+          <div className="field">
+            <div className="field-label">タグ</div>
+            <div className="tag-edit">
+              {tags.map(tg => <span key={tg} className="tag-chip rm" style={{ '--tg': tagColor(tg) }} onClick={() => removeTag(tg)}>{tg}<Ic d={Icons.x} size={10} sw={2.6} /></span>)}
+              <input className="tag-input" placeholder="タグを追加（Enter）" value={tagInput} onChange={e => setTagInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } else if (e.key === 'Backspace' && !tagInput && tags.length) removeTag(tags[tags.length - 1]); }} />
+            </div>
+          </div>
+
+          <div className="field">
+            <div className="field-label">メモ</div>
+            <textarea className="note-input" rows={3} value={d.note || ''} placeholder="詳細・リンク・手順など" onChange={e => set('note', e.target.value)} />
+          </div>
+
           <div className="reco-preview">
             <div className="rp-reco">{RECO[g]}</div>
             <div className="rp-div" />
@@ -276,6 +352,8 @@ function SettingsModal({ categories, setCategories, addCategory, deleteCategory,
   const [pop, setPop] = useS(null);
   const [newName, setNewName] = useS('');
   const [newColor, setNewColor] = useS(CAT_PALETTE[7]);
+  const [notif, setNotif] = useS(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
+  const enableNotif = () => { if (typeof Notification !== 'undefined') Notification.requestPermission().then(p => setNotif(p)); };
   const count = id => tasks.filter(t => t.category === id).length;
   const rename = (id, name) => setCategories(cs => cs.map(c => c.id === id ? { ...c, name } : c));
   const recolor = (id, color) => { setCategories(cs => cs.map(c => c.id === id ? { ...c, color } : c)); setPop(null); };
@@ -326,6 +404,19 @@ function SettingsModal({ categories, setCategories, addCategory, deleteCategory,
             </div>
           </div>
           <div className="set-sec">
+            <span className="eyebrow">リマインダー</span>
+            <div className="set-data-row">
+              <div className="sd-text">
+                <div className="sd-title">締切のブラウザ通知</div>
+                <div className="sd-sub">今日が締切・期限超過のタスクを通知します。ページを開いている間だけ動作します（常駐通知はサーバーが必要）。</div>
+              </div>
+              {notif === 'granted' ? <button className="btn btn-ghost" disabled>オン</button>
+                : notif === 'denied' ? <button className="btn btn-ghost" disabled>ブロック中</button>
+                : notif === 'unsupported' ? <button className="btn btn-ghost" disabled>非対応</button>
+                : <button className="btn btn-primary" onClick={enableNotif}>オンにする</button>}
+            </div>
+          </div>
+          <div className="set-sec">
             <span className="eyebrow">データ</span>
             <div className="set-data-row">
               <div className="sd-text">
@@ -345,12 +436,13 @@ function SettingsModal({ categories, setCategories, addCategory, deleteCategory,
 }
 
 /* ========================================================= */
-function App() {
-  const [tasks, setTasks] = useS(loadTasks);
+function Workspace({ profileId, profiles, active: activeProfile, setProfile, addProfile, renameProfile, deleteProfile }) {
+  const [tasks, setTasks] = useS(() => loadTasks(profileId));
   const [view, setView] = useS('list');
   const [activeCat, setCat] = useS('all');
   const [activeFilter, setFilter] = useS('all');
   const [sort, setSort] = useS('score');
+  const [query, setQuery] = useS('');
   const [editing, setEditing] = useS(null);
   const [hlId, setHl] = useS(null);
   const [flashId, setFlash] = useS(null);
@@ -358,20 +450,31 @@ function App() {
   const [mobView, setMobView] = useS('center');
   const dragId = useR(null);
   const [dragState, setDragState] = useS(null);
-  const [categories, setCategories] = useS(loadCats);
-  const [accent, setAccent] = useS(loadAccent);
+  const [categories, setCategories] = useS(() => loadCats(profileId));
+  const [accent, setAccent] = useS(() => loadAccent(profileId));
   const [settingsOpen, setSettings] = useS(false);
   applyCats(categories);
   const acc = ACCENTS.find(a => a.id === accent) || ACCENTS[0];
 
-  useE(() => { saveTasks(tasks); }, [tasks]);
-  useE(() => { saveCats(categories); applyCats(categories); }, [categories]);
-  useE(() => { saveAccent(accent); }, [accent]);
+  useE(() => { saveTasks(profileId, tasks); }, [tasks]);
+  useE(() => { saveCats(profileId, categories); applyCats(categories); }, [categories]);
+  useE(() => { saveAccent(profileId, accent); }, [accent]);
+  // リマインダー：通知が許可されていれば、ページを開いている間に締切タスクを通知
+  useE(() => { checkReminders(tasks); const id = setInterval(() => checkReminders(tasks), 60000); return () => clearInterval(id); }, [tasks]);
 
   const addCategory = (name, color) => setCategories(cs => [...cs, { id: newId(), name: name.trim(), color }]);
   const deleteCategory = (id) => { const rest = categories.filter(c => c.id !== id); const fb = rest.length ? rest[0].id : null; setTasks(ts => ts.map(t => t.category === id ? { ...t, category: fb } : t)); setCategories(rest); if (activeCat === id) setCat('all'); };
 
-  const toggle = id => setTasks(ts => ts.map(t => t.id === id ? { ...t, done: !t.done, completedAt: !t.done ? localYmd() : null } : t));
+  const toggle = id => setTasks(ts => {
+    const t = ts.find(x => x.id === id);
+    // 繰り返しタスクを完了 → 完了として記録しつつ、次回分を自動生成（ルーティン）
+    if (t && !t.done && t.repeat && t.repeat !== 'none') {
+      const completed = { ...t, done: true, completedAt: localYmd() };
+      const next = { ...t, id: newId(), done: false, completedAt: null, deadline: nextRepeatDate(t.deadline, t.repeat), subtasks: (t.subtasks || []).map(s => ({ ...s, done: false })) };
+      return [next, ...ts.map(x => x.id === id ? completed : x)];
+    }
+    return ts.map(x => x.id === id ? { ...x, done: !x.done, completedAt: !x.done ? localYmd() : null } : x);
+  });
   const resetData = () => { setTasks([]); setCat('all'); setFilter('all'); setView('list'); };
   const save = d => { setTasks(ts => ts.some(t => t.id === d.id) ? ts.map(t => t.id === d.id ? { ...d, _isNew: undefined } : t) : [{ ...d, _isNew: undefined }, ...ts]); if (d._isNew) { setFlash(d.id); setTimeout(() => setFlash(null), 1100); } setEditing(null); };
   const add = t => { setTasks(ts => [t, ...ts]); setFlash(t.id); setTimeout(() => setFlash(null), 1100); };
@@ -392,8 +495,9 @@ function App() {
     let l = active;
     if (activeCat !== 'all') l = l.filter(t => t.category === activeCat);
     if (activeFilter !== 'all') l = l.filter(FILTERS[activeFilter].test);
+    if (query.trim()) l = l.filter(t => searchMatch(t, query));
     return l;
-  }, [tasks, activeCat, activeFilter]);
+  }, [tasks, activeCat, activeFilter, query]);
   const sortedFlat = useM(() => { const a = [...filtered]; if (sort === 'score') a.sort((x, y) => scoreOf(y) - scoreOf(x)); return a; }, [filtered, sort, tasks]);
   const byGroup = useM(() => { const m = {}; GROUP_ORDER.forEach(g => m[g] = []); sortedFlat.forEach(t => m[groupOf(t)].push(t)); return m; }, [sortedFlat]);
   const onDropGroup = (e, g) => { const arr = byGroup[g]; const last = arr && arr[arr.length - 1]; if (last && last.id !== dragId.current) reorder(last.id, 'after'); };
@@ -401,8 +505,10 @@ function App() {
   const archived = tasks.filter(t => t.done).sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''));
 
   const titleInfo = (() => {
+    if (view === 'calendar') return { q: 'カレンダー', s: '締切を月単位で俯瞰する' };
     if (view === 'matrix') return { q: '優先度マトリクス', s: '重要度と緊急度で全タスクを俯瞰する' };
     if (view === 'archive') return { q: '完了アーカイブ', s: `${archived.length}件の達成記録` };
+    if (query.trim()) return { q: '検索結果', s: `「${query.trim()}」に一致 ${filtered.length}件` };
     if (activeFilter !== 'all') return { q: FILTERS[activeFilter].name, s: `${filtered.length}件のタスク` };
     if (activeCat !== 'all') return { q: CAT_MAP[activeCat].name, s: `${filtered.length}件のタスク` };
     return { q: '次に何をすべきか', s: '推奨順に並んだ意思決定リスト' };
@@ -414,7 +520,8 @@ function App() {
   return (
     <div className={`app ${menuOpen ? 'menu-open' : ''}`} style={{ '--accent': acc.main, '--accent-ink': acc.ink, '--accent-soft': acc.soft }}>
       <div className="scrim-mob" onClick={() => setMenu(false)} />
-      <Sidebar tasks={tasks} categories={categories} activeCat={activeCat} setCat={setCat} activeFilter={activeFilter} setFilter={setFilter} view={view} setView={setView} onManage={() => setSettings(true)} onClose={() => setMenu(false)} />
+      <Sidebar tasks={tasks} categories={categories} activeCat={activeCat} setCat={setCat} activeFilter={activeFilter} setFilter={setFilter} view={view} setView={setView} onManage={() => setSettings(true)} onClose={() => setMenu(false)}
+        profiles={profiles} active={activeProfile} setProfile={setProfile} addProfile={addProfile} renameProfile={renameProfile} deleteProfile={deleteProfile} />
 
       {/* CENTER */}
       <main className={`col center ${mobView === 'right' ? 'mob-hide' : ''}`}>
@@ -437,6 +544,13 @@ function App() {
           </div>
           {view === 'list' && <div style={{ paddingBottom: 4 }}><QuickAdd onAdd={add} onDetail={openDetail} defaultCat={activeCat} categories={categories} /></div>}
           {view === 'list' && (
+            <div className="searchbar">
+              <Ic d={Icons.search} size={15} className="search-ico" />
+              <input className="search-input" placeholder="タスク・メモ・タグを検索…" value={query} onChange={e => setQuery(e.target.value)} />
+              {query && <button className="search-clear" onClick={() => setQuery('')} aria-label="クリア"><Ic d={Icons.x} size={14} /></button>}
+            </div>
+          )}
+          {view === 'list' && (
             <div className="filterbar">
               <button className={`fchip ${activeFilter === 'all' && activeCat === 'all' ? 'active' : ''}`} onClick={() => { setFilter('all'); setCat('all'); }}>すべて</button>
               <span className="fsep" />
@@ -455,6 +569,8 @@ function App() {
               <GroupSection key={g} g={g} list={byGroup[g]} dragState={dragState} handlers={handlers} />
             ))
           )}
+
+          {view === 'calendar' && <Calendar tasks={tasks} onOpen={setEditing} />}
 
           {view === 'matrix' && (
             <div style={{ maxWidth: 560 }}>
@@ -520,6 +636,26 @@ function App() {
       {settingsOpen && <SettingsModal categories={categories} setCategories={setCategories} addCategory={addCategory} deleteCategory={deleteCategory} tasks={tasks} accent={accent} setAccent={setAccent} onReset={resetData} onClose={() => setSettings(false)} />}
     </div>
   );
+}
+
+/* ---------- App shell: ローカルアカウント（プロフィール）を管理 ---------- */
+function App() {
+  const [profiles, setProfiles] = useS(loadProfiles);
+  const [profile, setProfileId] = useS(loadActiveProfile);
+  useE(() => { saveProfiles(profiles); }, [profiles]);
+  useE(() => { saveActiveProfile(profile); }, [profile]);
+  const active = profiles.find(p => p.id === profile) || profiles[0];
+  const setProfile = id => setProfileId(id);
+  const addProfile = name => { const id = newId(); setProfiles(p => [...p, { id, name: (name || '').trim() || '新しいアカウント' }]); setProfileId(id); };
+  const renameProfile = (id, name) => setProfiles(p => p.map(x => x.id === id ? { ...x, name } : x));
+  const deleteProfile = id => {
+    if (id === 'default') return;
+    clearProfileData(id);
+    setProfiles(p => p.filter(x => x.id !== id));
+    if (profile === id) setProfileId('default');
+  };
+  return <Workspace key={profile} profileId={profile} profiles={profiles} active={active}
+    setProfile={setProfile} addProfile={addProfile} renameProfile={renameProfile} deleteProfile={deleteProfile} />;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);

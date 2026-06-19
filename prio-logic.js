@@ -23,6 +23,46 @@ function streakDays(tasks) {
   return n;
 }
 
+// ---- 繰り返し（ルーティン） ----
+const REPEATS = [
+  { id: 'none',     name: 'なし' },
+  { id: 'daily',    name: '毎日' },
+  { id: 'weekdays', name: '平日（月〜金）' },
+  { id: 'weekly',   name: '毎週' },
+  { id: 'monthly',  name: '毎月' },
+];
+function repeatLabel(id) { const r = REPEATS.find(x => x.id === id); return r ? r.name : 'なし'; }
+// 完了時に作る「次回」の締切日を計算（基準は元の締切、無ければ今日）
+function nextRepeatDate(ymd, repeat) {
+  const d = ymd ? new Date(ymd) : new Date(TODAY);
+  if (repeat === 'daily') d.setDate(d.getDate() + 1);
+  else if (repeat === 'weekly') d.setDate(d.getDate() + 7);
+  else if (repeat === 'monthly') d.setMonth(d.getMonth() + 1);
+  else if (repeat === 'weekdays') { do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0 || d.getDay() === 6); }
+  else return ymd;
+  return localYmd(d);
+}
+
+// ---- サブタスク進捗 ----
+function subProgress(t) { const s = t.subtasks || []; return { total: s.length, done: s.filter(x => x.done).length }; }
+
+// ---- タグ（ラベル）に安定した色を割り当て ----
+function tagColor(tag) {
+  let h = 0; for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
+  return CAT_PALETTE[h % CAT_PALETTE.length];
+}
+
+// ---- 検索（タイトル・メモ・タグ・サブタスクを横断） ----
+function searchMatch(t, q) {
+  if (!q) return true;
+  const s = q.trim().toLowerCase(); if (!s) return true;
+  if ((t.title || '').toLowerCase().includes(s)) return true;
+  if ((t.note || '').toLowerCase().includes(s)) return true;
+  if ((t.tags || []).some(x => x.toLowerCase().includes(s))) return true;
+  if ((t.subtasks || []).some(x => (x.title || '').toLowerCase().includes(s))) return true;
+  return false;
+}
+
 // ---- Curated calm palette for categories / custom colors ----
 const CAT_PALETTE = [
   '#B4533A', '#C2691D', '#9A7B2E', '#5F7A3E', '#3E7D63', '#2F7E72',
@@ -229,4 +269,5 @@ Object.assign(window, {
   scoreOf, groupOf, colorVarOf, daysUntil, deadlineState, fmtDate, fmtMinutes, badgesOf, startOfDay,
   recommendationOf, isUrgentSignal, reasonChips, heroReason, impactOf, applyCats, catOf,
   localYmd, completedOn, streakDays,
+  REPEATS, repeatLabel, nextRepeatDate, subProgress, tagColor, searchMatch,
 });

@@ -434,3 +434,87 @@ input, select, textarea { font-family: inherit; }
 .sd-sub { font-size: 11.5px; color: var(--ink-4); margin-top: 3px; line-height: 1.5; }
 .btn-danger-outline { flex: none; font-size: 12.5px; font-weight: 600; color: var(--signal-ink); background: var(--surface); border: 1px solid var(--signal-line); border-radius: var(--r-sm); padding: 8px 16px; cursor: pointer; transition: var(--t); }
 .btn-danger-outline:hover { background: var(--signal-soft); }
+
+/* ===== アカウント（ローカルプロフィール）切替 ===== */
+.profile { position: relative; padding: 0 16px 14px; }
+.profile-btn { display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 10px; background: var(--fill); border: 1px solid var(--line-2); border-radius: var(--r-md); cursor: pointer; transition: var(--t); }
+.profile-btn:hover { background: var(--fill-2); }
+.profile-avatar { flex: none; width: 26px; height: 26px; border-radius: 7px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 700; display: grid; place-items: center; }
+.profile-avatar.sm { width: 22px; height: 22px; border-radius: 6px; font-size: 11.5px; }
+.profile-name { flex: 1; min-width: 0; text-align: left; font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.profile-chev { color: var(--ink-4); flex: none; }
+.profile-scrim { position: fixed; inset: 0; z-index: 60; }
+.profile-pop { position: absolute; left: 16px; right: 16px; top: calc(100% - 6px); z-index: 61; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-lg); box-shadow: 0 16px 44px rgba(24,25,27,.16); padding: 8px; }
+.pp-label { font-size: 10.5px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-4); padding: 4px 6px 6px; }
+.pp-row { display: flex; align-items: center; gap: 2px; border-radius: var(--r-sm); }
+.pp-row.on { background: var(--accent-soft); }
+.pp-pick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px; background: none; border: none; cursor: pointer; }
+.pp-name { flex: 1; min-width: 0; background: none; border: none; font-size: 13px; font-weight: 550; color: var(--ink); padding: 2px 4px; border-radius: 5px; }
+.pp-name:hover, .pp-name:focus { background: var(--fill); outline: none; }
+.pp-check { color: var(--accent-ink); flex: none; margin-right: 4px; }
+.pp-del { flex: none; background: none; border: none; color: var(--ink-5); padding: 6px; cursor: pointer; border-radius: 5px; }
+.pp-del:hover { color: var(--signal); background: var(--signal-soft); }
+.pp-new { display: flex; align-items: center; gap: 7px; width: 100%; padding: 8px 6px; margin-top: 2px; background: none; border: none; font-size: 12.5px; font-weight: 600; color: var(--accent-ink); cursor: pointer; border-radius: var(--r-sm); }
+.pp-new:hover { background: var(--fill); }
+.pp-add { display: flex; gap: 6px; padding: 6px; }
+.pp-add .pp-name { background: var(--fill); }
+.pp-hint { font-size: 10.5px; color: var(--ink-4); line-height: 1.5; padding: 8px 6px 4px; border-top: 1px solid var(--line); margin-top: 6px; }
+
+/* ===== タグ ===== */
+.dcard-tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 7px 0 2px; }
+.tag-chip { font-size: 10.5px; font-weight: 600; color: var(--tg, var(--ink-3)); background: color-mix(in srgb, var(--tg, #888) 12%, transparent); border: 1px solid color-mix(in srgb, var(--tg, #888) 22%, transparent); padding: 2px 8px; border-radius: 99px; line-height: 1.5; }
+.tag-chip.rm { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.tag-chip.rm:hover { background: color-mix(in srgb, var(--tg, #888) 20%, transparent); }
+.meta-item.sub-done { color: var(--done); }
+.meta-item.meta-note { color: var(--ink-4); }
+
+/* ===== エディタ：サブタスク／タグ／メモ ===== */
+.sub-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+.sub-row { display: flex; align-items: center; gap: 8px; }
+.sub-check { flex: none; width: 18px; height: 18px; border-radius: 6px; border: 1.6px solid var(--line-3); background: var(--surface); color: transparent; display: grid; place-items: center; cursor: pointer; transition: var(--t); }
+.sub-check.done { background: var(--done); border-color: var(--done); color: #fff; }
+.sub-input { flex: 1; min-width: 0; border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 7px 10px; font-size: 13px; color: var(--ink); background: var(--surface); }
+.sub-input.done { text-decoration: line-through; color: var(--ink-4); }
+.sub-del { flex: none; background: none; border: none; color: var(--ink-5); cursor: pointer; padding: 4px; border-radius: 5px; }
+.sub-del:hover { color: var(--signal); background: var(--signal-soft); }
+.sub-add { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px dashed var(--line-3); border-radius: var(--r-sm); padding: 7px 12px; font-size: 12.5px; font-weight: 600; color: var(--ink-3); cursor: pointer; transition: var(--t); }
+.sub-add:hover { border-color: var(--accent); color: var(--accent-ink); background: var(--accent-soft); }
+.tag-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 7px 9px; background: var(--surface); }
+.tag-input { flex: 1; min-width: 100px; border: none; outline: none; font-size: 13px; color: var(--ink); background: none; padding: 2px; }
+.note-input { width: 100%; border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 9px 11px; font-size: 13px; font-family: var(--font); color: var(--ink); background: var(--surface); resize: vertical; line-height: 1.6; }
+
+/* ===== 検索バー ===== */
+.searchbar { display: flex; align-items: center; gap: 8px; background: var(--fill); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 0 10px; margin: 8px 0 10px; }
+.search-ico { color: var(--ink-4); flex: none; }
+.search-input { flex: 1; border: none; outline: none; background: none; font-size: 13.5px; color: var(--ink); padding: 9px 0; }
+.search-clear { flex: none; background: none; border: none; color: var(--ink-4); cursor: pointer; padding: 4px; border-radius: 5px; display: grid; place-items: center; }
+.search-clear:hover { color: var(--ink-2); background: var(--fill-2); }
+
+/* ===== カレンダー（月表示） ===== */
+.cal-wrap { max-width: 640px; }
+.cal-head { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; }
+.cal-month { font-size: 16px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; min-width: 118px; text-align: center; }
+.cal-today-btn { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--accent-ink); background: var(--accent-soft); border: none; border-radius: var(--r-sm); padding: 7px 14px; cursor: pointer; transition: var(--t); }
+.cal-today-btn:hover { filter: brightness(.97); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-dow { margin-bottom: 4px; }
+.cal-dow-c { text-align: center; font-size: 11px; font-weight: 600; color: var(--ink-4); padding: 4px 0; }
+.cal-dow-c.sun { color: var(--signal-ink); }
+.cal-dow-c.sat { color: var(--schedule-ink); }
+.cal-cell { position: relative; aspect-ratio: 1 / 1; min-height: 46px; display: flex; flex-direction: column; align-items: center; padding: 6px 0 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer; transition: var(--t); }
+.cal-cell:hover { border-color: var(--line-3); background: var(--fill); }
+.cal-cell.empty { background: none; border: none; cursor: default; }
+.cal-cell.today { border-color: var(--accent); }
+.cal-cell.sel { background: var(--accent-soft); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.cal-d { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.cal-d.sun { color: var(--signal-ink); }
+.cal-d.sat { color: var(--schedule-ink); }
+.cal-cell.today .cal-d { color: var(--accent-ink); font-weight: 750; }
+.cal-dots { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px; margin-top: 4px; padding: 0 3px; }
+.cal-dot { width: 5px; height: 5px; border-radius: 99px; }
+.cal-more { font-size: 9px; font-weight: 600; color: var(--ink-4); }
+.cal-day-list { margin-top: 22px; }
+.cal-day-head { display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.cal-day-label { font-size: 14px; font-weight: 700; color: var(--ink); }
+.cal-day-list .cos-row { padding: 10px 4px; }
+.cal-day-list .cos-row-mark { width: 3px; height: 30px; border-radius: 99px; flex: none; }
